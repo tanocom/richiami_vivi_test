@@ -1,0 +1,411 @@
+FreeBSD* Driver for Intel(R) Ethernet
+=====================================
+
+April 2, 2021
+
+Contents
+========
+
+- Overview
+- Identifying Your Adapter
+- Building and Installation
+- Additional Features and Configurations
+- Known Issues/Troubleshooting
+- Support
+- License
+
+
+Overview
+========
+This file describes the FreeBSD* driver for Intel(R) Ethernet. This driver has
+been developed for use with all community-supported versions of FreeBSD.
+
+For questions related to hardware requirements, refer to the documentation
+supplied with your Intel Ethernet Adapter. All hardware requirements listed
+apply to use with FreeBSD.
+
+
+Related Documentation
+=====================
+
+See the "Intel(R) Ethernet Adapters and Devices User Guide" for additional
+information on features. It is available on the Intel website at either of the
+following:
+
+- https://cdrdv2.intel.com/v1/dl/getContent/705831
+-
+https://www.intel.com/content/www/us/en/download/19373/adapter-user-guide-for-in
+tel-ethernet-adapters.html
+
+
+Identifying Your Adapter
+========================
+This release includes the gigabit FreeBSD base driver for Intel(R) Ethernet.
+
+- The igb driver supports all 82575 and 82576-based gigabit network connections.
+- Gigabit devices based on the Intel(R) Ethernet Controller X722 are supported
+  by the ixl driver.
+
+For information on how to identify your adapter, and for the latest Intel
+network drivers, refer to the Intel Support website:
+http://www.intel.com/support
+
+
+Building and Installation
+=========================
+NOTE: This driver package is to be used only as a standalone archive and the
+user should not attempt to incorporate it into the kernel source tree.
+
+In the instructions below, x.x.x is the driver version as indicated in the name
+of the driver tar file.
+
+1. Move the base driver tar file to the directory of your choice. For
+   example, use /home/username/igb or /usr/local/src/igb.
+
+2. Untar/unzip the archive:
+
+   # tar xzf igb-x.x.x.tar.gz
+
+This will create the igb-x.x.x directory.
+
+3. To install man page:
+
+   # cd igb-x.x.x
+   # gzip -c igb.4 > /usr/share/man/man4/igb.4.gz
+
+4. To load the driver onto a running system:
+
+   # cd igb-x.x.x/src
+   # make
+   # kldload ./if_igb.ko
+
+5. To assign an IP address to the interface, enter the following,
+   where X is the interface number for the device:
+
+   # ifconfig igbX <IP_address>
+
+6. Verify that the interface works. Enter the following, where <IP_address>
+   is the IP address for another machine on the same subnet as the interface
+   that is being tested:
+
+   # ping <IP_address>
+
+7. If you want the driver to load automatically when the system is booted:
+
+   # cd igb-x.x.x/src
+   # make
+   # make install
+
+Edit /boot/loader.conf, and add the following line:
+   if_igb_load="YES"
+
+Edit /etc/rc.conf, and create the appropriate ifconfig_igbX entry:
+
+   ifconfig_igbX="<ifconfig_settings>"
+
+Example usage:
+   ifconfig_igb0="inet 192.168.10.1 netmask 255.255.255.0"
+
+    NOTE: For assistance, see the ifconfig man page.
+
+
+Additional Features and Configurations
+======================================
+
+Speed and Duplex Configuration
+------------------------------
+In addressing speed and duplex configuration issues, you need to distinguish
+between copper-based adapters and fiber-based adapters.
+
+In the default mode, an Intel(R) Ethernet Network Adapter using copper
+connections will attempt to auto-negotiate with its link partner to determine
+the best setting. If the adapter cannot establish link with the link partner
+using auto-negotiation, you may need to manually configure the adapter and link
+partner to identical settings to establish link and pass packets. This should
+only be needed when attempting to link with an older switch that does not
+support auto-negotiation or one that has been forced to a specific speed or
+duplex mode. Your link partner must match the setting you choose. 1 Gbps speeds
+and higher cannot be forced. Use the autonegotiation advertising setting to
+manually set devices for 1 Gbps and higher.
+
+Caution: Only experienced network administrators should force speed and duplex
+or change autonegotiation advertising manually. The settings at the switch must
+always match the adapter settings. Adapter performance may suffer or your
+adapter may not operate if you configure the adapter differently from your
+switch.
+
+An Intel(R) Ethernet Network Adapter using fiber-based connections, however,
+will not attempt to auto-negotiate with its link partner since those adapters
+operate only in full duplex and only at their native speed.
+
+By default, the adapter auto-negotiates the speed and duplex of the connection.
+If there is a specific need, the ifconfig utility can be used to configure the
+speed and duplex settings on the adapter.
+
+Example usage:
+
+# ifconfig igbX <IP_address> media 100baseTX mediaopt full-duplex
+
+NOTE: Only use mediaopt to set the driver to full-duplex. If mediaopt is not
+specified and you are not running at gigabit speed, the driver defaults to
+half-duplex.
+
+If the interface is currently forced to 100 full duplex, you must use this
+command to change to half duplex:
+
+# ifconfig igbX <IP_address> media 100baseTX -mediaopt full-duplex
+
+This driver supports the following media type options:
+
+Media Type          Description
+----------          -----------
+autoselect          Enables auto-negotiation for speed and duplex.
+10baseT/UTP         Sets speed to 10 Mbps. Use the ifconfig mediaopt
+                    option to select full-duplex mode.
+100baseTX           Sets speed to 100 Mbps. Use the ifconfig mediaopt
+                    option to select full-duplex mode.
+1000baseTX          Sets speed to 1000 Mbps. In this case, the driver
+                    supports only full-duplex mode.
+1000baseSX          Sets speed to 1000 Mbps. In this case, the driver
+                    supports only full-duplex mode.
+
+For more information on the ifconfig utility, refer to the ifconfig man page.
+
+Jumbo Frames
+------------
+Jumbo Frames support is enabled by changing the Maximum Transmission Unit (MTU)
+to a value larger than the default value of 1500.
+
+Use the ifconfig command to increase the MTU size. For example, enter the
+following where X is the interface number:
+
+# ifconfig igbX mtu 9000
+
+To confirm an interface's MTU value, use the ifconfig command.
+
+To confirm the MTU used between two specific devices, use:
+
+# route get <destination_IP_address>
+
+NOTE: The maximum MTU setting for jumbo frames is 9216. This corresponds to the
+maximum jumbo frame size of 9238 bytes.
+
+NOTE: Using jumbo frames at 10 or 100 Mbps is not supported and may result in
+poor performance or loss of link.
+
+NOTE: Packet loss may have a greater impact on throughput when you use jumbo
+frames. If you observe a drop in performance after enabling jumbo frames,
+enabling flow control may mitigate the issue.
+
+
+VLANS
+-----
+To create a new VLAN interface:
+
+# ifconfig <vlan_name> create
+
+To associate the VLAN interface with a physical interface and assign a VLAN ID,
+IP address, and netmask:
+
+# ifconfig <vlan_name> <ip_address> netmask <subnet_mask> vlan <vlan_id>
+vlandev <physical_interface>
+
+Example:
+
+# ifconfig vlan10 10.0.0.1 netmask 255.255.255.0 vlan 10 vlandev igb0
+
+In this example, all packets will be marked on egress with 802.1Q VLAN tags,
+specifying a VLAN ID of 10.
+
+To remove a VLAN interface:
+
+# ifconfig <vlan_name> destroy
+
+
+Polling
+-------
+NOTES:
+- Device Polling is only valid for non-SMP kernels.
+- The driver has to be built into the kernel for Device Polling to be
+  enabled in the driver.
+
+To enable polling in the driver, add the following options to the kernel
+configuration, and then recompile the kernel:
+
+  options DEVICE_POLLING
+  options HZ=1000
+
+At runtime use:
+  # ifconfig igbX polling (to turn polling on)
+and:
+  # ifconfig igbX -polling (to turn it off)
+
+
+Checksum Offload
+----------------
+Checksum offloading is not supported on 82542 Gigabit adapters.
+
+Checksum offloading supports both TCP and UDP packets and is supported for both
+transmit and receive.
+
+Checksum offloading can be enabled or disabled using ifconfig. Both transmit
+and receive offloading will be either enabled or disabled together. You cannot
+enable/disable one without the other.
+
+To enable checksum offloading:
+
+# ifconfig igbX rxcsum
+
+To disable checksum offloading:
+
+# ifconfig igbX -rxcsum
+
+To confirm the current setting:
+
+# ifconfig igbX
+
+Look for the presence or absence of the following line:
+  options=3 <RXCSUM,TXCSUM>
+
+See the ifconfig man page for further information.
+
+
+TSO
+---
+TSO (TCP Segmentation Offload) supports both IPv4 and IPv6. TSO can be disabled
+and enabled using the ifconfig utility or sysctl.
+
+NOTE: TSO requires Tx checksum, if Tx checksum is disabled, TSO will also be
+disabled.
+
+NOTE: By default only PCI-Express adapters are ENABLED to do TSO. Others can be
+enabled by the user at their own risk. TSO is not supported on 82547 or
+82544-based adapters, as well as older adapters.
+
+To enable/disable TSO in the stack:
+
+# sysctl net.inet.tcp.tso=0 (or 1 to enable it)
+
+Doing this disables/enables TSO in the stack and affects all installed adapters.
+
+To disable BOTH TSO IPv4 and IPv6, where X is the number of the interface in
+use:
+
+# ifconfig igbX -tso
+
+To enable BOTH TSO IPv4 and IPv6:
+
+# ifconfig igbX tso
+
+You can also enable/disable IPv4 TSO or IPv6 TSO individually. Simply replace
+tso|-tso in the above command with tso4 or tso6. For example, to disable
+TSO IPv4:
+
+# ifconfig igbX -tso4
+
+To disable TSO IPv6:
+
+# ifconfig igbX -tso6
+
+
+MSI-X
+-----
+MSI or MSI-X can be turned off by an entry in /etc/sysctl.conf
+
+  hw.em.enable_msi=0
+
+Unload and reload the driver.
+
+
+LRO
+---
+LRO (Large Receive Offload) may provide Rx performance improvement. However, it
+is incompatible with packet-forwarding workloads. You should carefully evaluate
+the environment and enable LRO when possible.
+
+To enable:
+
+# ifconfig igbX lro
+
+It can be disabled by using:
+
+# ifconfig igbX -lro
+
+
+EEE (Energy Efficient Ethernet)
+-------------------------------
+Valid Range: 0-1
+0 = Disables EEE
+1 = Enables EEE
+
+A link between two EEE-compliant devices will result in periodic bursts of data
+followed by periods where the link is in an idle state. This Low Power Idle
+(LPI) state is supported at 1 Gbps and 100 Mbps link speeds.
+
+NOTES:
+- EEE support requires auto-negotiation.
+- Both link partners must support EEE.
+- EEE is not supported on all Intel(R) Ethernet Network devices or at all link
+speeds.
+
+Example:
+
+# sysctl dev.igb.<interface #>.eee.enable=[0|1]
+
+
+DMAC
+----
+Valid Range: 0, 1, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
+9000, 10000
+This parameter enables or disables DMA Coalescing feature. Values are in
+microseconds and set the internal DMA Coalescing internal timer.
+DMA (Direct Memory Access) allows the network device to move packet data
+directly to the system's memory, reducing CPU utilization. However, the
+frequency and random intervals at which packets arrive do not allow the system
+to enter a lower power state. DMA Coalescing allows the adapter to collect
+packets before it initiates a DMA event. This may increase network latency but
+also increases the chances that the system will enter a lower power state.
+Turning on DMA Coalescing may save energy. DMA Coalescing must be enabled
+across all active ports in order to save platform power.
+
+
+Known Issues/Troubleshooting
+============================
+
+Detected Tx Unit Hang in Quad Port Adapters
+-------------------------------------------
+In some cases, ports 3 and 4 don't pass traffic and report "Detected Tx Unit
+Hang" followed by "NETDEV WATCHDOG: igbX: transmit timed out" errors. Ports 1
+and 2 do not show any errors and will pass traffic.
+
+This issue may be resolved by updating to the latest kernel and BIOS. You
+should use an OS that fully supports Message Signaled Interrupts (MSI) and make
+sure that MSI is enabled in your system's BIOS.
+
+
+There are known performance issues with this driver when running UDP traffic
+with Jumbo Frames.
+----------------------------------------------------------------------------
+
+
+Support
+=======
+For general information, go to the Intel support website at:
+http://www.intel.com/support/
+
+If an issue is identified with the released source code on a supported kernel
+with a supported adapter, email the specific information related to the issue
+to freebsd@intel.com
+
+
+Copyright(c) 1999-2021 Intel Corporation.
+
+
+Trademarks
+==========
+Intel is a trademark or registered trademark of Intel Corporation or its
+subsidiaries in the United States and/or other countries.
+
+* Other names and brands may be claimed as the property of others.
+
+
